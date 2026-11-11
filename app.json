@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "SargaWatch",
+    "slug": "sargawatch",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A7E9C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.sargawatch.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SargaWatch shows your position on the beach map.",
+        "NSCameraUsageDescription": "Take a photo of the beach to add to your report.",
+        "NSPhotoLibraryUsageDescription": "Choose a beach photo to add to your report.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.sargawatch.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFC97A"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA"
+      ],
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a beach photo to add to your report.",
+          "cameraPermission": "Take a photo of the beach to add to your report."
+        }
+      ]
+    ],
+    "owner": "yannsbhs-team",
+    "extra": {
+      "eas": {
+        "projectId": "a72d9414-3b04-47d0-afc8-bfbcebfe8a34"
+      }
+    }
+  }
+}
