@@ -3,42 +3,46 @@ import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { STATUS } from './config';
 
-// Carte OpenStreetMap (fonds CARTO) affichée avec Leaflet : aucune clé Google nécessaire.
+// Carte OpenStreetMap (fonds OpenFreeMap) affichée avec MapLibre : aucune clé nécessaire.
 const HTML = `<!DOCTYPE html>
 <html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
   html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: #dfeef2; }
-  .pin { width: 30px; height: 30px; border-radius: 15px; border: 3px solid #fff;
+  .pin { width: 30px; height: 30px; border-radius: 15px; border: 3px solid #fff; box-sizing: border-box;
          display: flex; align-items: center; justify-content: center; font-size: 14px;
          box-shadow: 0 1px 4px rgba(0,0,0,.35); }
-  .leaflet-control-attribution { font-size: 9px; }
 </style>
 </head><body>
 <div id="map"></div>
 <script>
-  var map = L.map('map', { zoomControl: false }).setView([17.5, -72], 5);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd',
-    attribution: '&copy; OpenStreetMap &copy; CARTO'
-  }).addTo(map);
-  var layer = L.layerGroup().addTo(map);
+  // Fonds de carte OpenFreeMap (données OpenStreetMap) : gratuits, sans clé ni limite
+  var map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [-72, 17.5], zoom: 4,
+    attributionControl: { compact: true }
+  });
+  var markers = [];
   function send(o) { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(o)); }
   window.setBeaches = function (list) {
-    layer.clearLayers();
-    list.forEach(function (b) {
-      var icon = L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15],
-        html: '<div class="pin" style="background:' + b.color + '">' + b.emoji + '</div>' });
-      L.marker([b.lat, b.lng], { icon: icon }).on('click', function () { send({ type: 'open', id: b.id }); }).addTo(layer);
+    markers.forEach(function (m) { m.remove(); });
+    markers = list.map(function (b) {
+      var el = document.createElement('div');
+      el.className = 'pin';
+      el.style.background = b.color;
+      el.textContent = b.emoji;
+      el.addEventListener('click', function (e) { e.stopPropagation(); send({ type: 'open', id: b.id }); });
+      return new maplibregl.Marker({ element: el }).setLngLat([b.lng, b.lat]).addTo(map);
     });
   };
   window.goTo = function (r) {
-    map.flyToBounds([[r.latitude - r.latitudeDelta / 2, r.longitude - r.longitudeDelta / 2],
-                     [r.latitude + r.latitudeDelta / 2, r.longitude + r.longitudeDelta / 2]], { duration: 0.6 });
+    map.fitBounds([[r.longitude - r.longitudeDelta / 2, r.latitude - r.latitudeDelta / 2],
+                   [r.longitude + r.longitudeDelta / 2, r.latitude + r.latitudeDelta / 2]], { duration: 600 });
   };
-  send({ type: 'ready' });
+  map.on('load', function () { send({ type: 'ready' }); });
 </script>
 </body></html>`;
 
