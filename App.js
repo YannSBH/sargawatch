@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import MapView, { Marker } from 'react-native-maps';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { C, STATUS } from './src/config';
@@ -13,6 +12,7 @@ import { fetchBeaches, fetchCountries, myFavorites, toggleFavorite } from './src
 import { Chip, StatusBadge, FlagDot, minutesAgo } from './src/ui';
 import BeachDetail from './src/BeachDetail';
 import ReportForm from './src/ReportForm';
+import BeachMap from './src/BeachMap';
 
 // Vue de départ de la carte pour chaque pays
 const REGIONS = {
@@ -162,25 +162,12 @@ function Main() {
             <Chip label={t.retry} active onPress={() => { setLoading(true); load(); }} />
           </View>
         ) : tab === 'map' ? (
-          <MapView
+          <BeachMap
             ref={mapRef}
-            style={{ flex: 1 }}
-            initialRegion={REGIONS[country] || REGIONS.ALL}
-            showsUserLocation
-          >
-            {visible.map((b) => (
-              <Marker
-                key={b.beach_id}
-                coordinate={{ latitude: b.lat, longitude: b.lng }}
-                onPress={() => setOpenId(b.beach_id)}
-                tracksViewChanges={false}
-              >
-                <View style={[st.pin, { backgroundColor: STATUS[b.status]?.color || STATUS.unknown.color }]}>
-                  <Text style={st.pinText}>{STATUS[b.status]?.emoji}</Text>
-                </View>
-              </Marker>
-            ))}
-          </MapView>
+            beaches={visible}
+            region={REGIONS[country] || REGIONS.ALL}
+            onOpen={(id) => setOpenId(id)}
+          />
         ) : (
           <FlatList
             data={visible}
