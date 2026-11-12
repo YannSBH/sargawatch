@@ -125,3 +125,23 @@ export function distanceKm(a, b) {
     Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
 }
+
+export const fetchForecasts = () =>
+  rest('forecasts?select=territory,source,source_url,bulletin_date,confidence,headline,forecast,trend,risk,east_only,fetched_at');
+
+export async function fetchAmenities(beachId) {
+  return rest(`beach_amenities?select=amenity,yes,no&beach_id=eq.${beachId}`);
+}
+
+export async function fetchCover(beachId) {
+  const rows = await rest(`beach_covers?select=photo_path&beach_id=eq.${beachId}`);
+  return rows[0]?.photo_path || null;
+}
+
+export async function voteAmenity(beachId, amenity, present) {
+  const p_device_id = await getDeviceId();
+  await rest('rpc/vote_amenity', {
+    method: 'POST',
+    body: JSON.stringify({ p_device_id, p_beach_id: beachId, p_amenity: amenity, p_present: present }),
+  });
+}

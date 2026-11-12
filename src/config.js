@@ -33,3 +33,24 @@ export const FLAG_COLORS = {
   purple: '#7B3FA0',
   none: '#9AA5AB',
 };
+
+// Prévision Météo-France (affichée en pointillés quand personne n'a signalé la plage)
+export const FORECAST = {
+  low: { color: '#3BAA4A' },
+  medium: { color: '#E0B000' },
+  high: { color: '#C46A1A' },
+};
+
+// Équipements confirmés par les utilisateurs
+export const AMENITIES = [
+  ['parking', '🅿️'],
+  ['shade', '🌴'],
+  ['sunbeds', '⛱️'],
+  ['food', '🍽️'],
+  ['toilets', '🚻'],
+  ['lifeguard', '🛟'],
+  ['snorkeling', '🤿'],
+  ['kids', '👶'],
+  ['surf', '🏄'],
+  ['accessible', '♿'],
+];

@@ -2,13 +2,18 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal, View, Text, ScrollView, Pressable, Image, StyleSheet, ActivityIndicator, Linking, Platform,
 } from 'react-native';
-import { C, FLAG_COLORS, STATUS } from './config';
+import { C, FLAG_COLORS, STATUS, FORECAST, AMENITIES } from './config';
 import { StatusBadge, FlagDot, minutesAgo } from './ui';
-import { fetchReports, vote, photoUrl, distanceKm } from './api';
+import { fetchReports, vote, photoUrl, distanceKm, fetchAmenities, voteAmenity, fetchCover } from './api';
 
-export default function BeachDetail({ beach, beaches, t, isFav, onToggleFav, onClose, onReport, onOpenBeach, refreshKey, children }) {
+export default function BeachDetail({ beach, beaches, forecast, t, isFav, onToggleFav, onClose, onReport, onOpenBeach, refreshKey, children }) {
   const [reports, setReports] = useState(null);
   const [votedIds, setVotedIds] = useState({});
+  const [amen, setAmen] = useState([]);
+  const [myAmen, setMyAmen] = useState({});
+  const [editAmen, setEditAmen] = useState(false);
+  const [cover, setCover] = useState(null);
+  const [showFc, setShowFc] = useState(false);
 
   const load = useCallback(async () => {
     if (!beach) return;
@@ -23,6 +28,26 @@ export default function BeachDetail({ beach, beaches, t, isFav, onToggleFav, onC
     setReports(null);
     load();
   }, [load, refreshKey]);
+
+  const loadAmen = useCallback(() => {
+    if (!beach) return;
+    fetchAmenities(beach.beach_id).then(setAmen).catch(() => {});
+  }, [beach]);
+
+  useEffect(() => {
+    loadAmen();
+    setCover(null);
+    if (beach) fetchCover(beach.beach_id).then(setCover).catch(() => {});
+  }, [loadAmen, beach?.beach_id, refreshKey]);
+
+  const toggleAmen = async (key) => {
+    const confirmed = amen.find((a) => a.amenity === key && a.yes > a.no);
+    const mine = myAmen[key];
+    const present = mine === undefined ? !confirmed : !mine;
+    setMyAmen((m) => ({ ...m, [key]: present }));
+    try { await voteAmenity(beach.beach_id, key, present); } catch {}
+    loadAmen();
+  };
 
   // Plage sans sargasses la plus proche (si celle-ci est touchée)
   const nearest = useMemo(() => {
@@ -65,6 +90,7 @@ export default function BeachDetail({ beach, beaches, t, isFav, onToggleFav, onC
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={st.body}>
+        {cover ? <Image source={{ uri: photoUrl(cover) }} style={st.cover} /> : null}
         <Text style={st.name}>{beach.name}</Text>
         <Text style={st.zone}>
           {beach.zone_name}
@@ -97,6 +123,66 @@ export default function BeachDetail({ beach, beaches, t, isFav, onToggleFav, onC
             <Text style={st.cardLabel}>{t.sea}</Text>
             <Text style={beach.sea ? st.cardValue : st.cardEmpty}>{beach.sea ? t.seas[beach.sea] : '—'}</Text>
           </View>
+        </View>
+
+        {forecast && beach.forecast_risk ? (
+          <Pressable style={[st.fc, { borderColor: FORECAST[beach.forecast_risk].color }]} onPress={() => setShowFc((v) => !v)}>
+            <View style={st.fcHead}>
+              <View style={[st.fcDot, { backgroundColor: FORECAST[beach.forecast_risk].color + '99' }]}><Text style={{ fontSize: 10 }}>🛰️</Text></View>
+              <Text style={st.fcTitle}>{t.forecastTitle}</Text>
+              <Text style={st.fcMore}>{showFc ? '▲' : '▼'}</Text>
+            </View>
+            <Text style={[st.fcRisk, { color: FORECAST[beach.forecast_risk].color }]}>{t.forecastRisk[beach.forecast_risk]}</Text>
+            <Text style={st.fcMeta}>
+              {forecast.bulletin_date}{forecast.confidence ? ` · ${t.confidence(forecast.confidence)}` : ''}
+            </Text>
+            {beach.forecast_lowered && forecast.risk !== 'low' ? <Text style={st.fcNote}>{t.forecastLowered}</Text> : null}
+            {showFc ? (
+              <View style={{ marginTop: 8, gap: 6 }}>
+                {t.forecastLang ? <Text style={st.fcNote}>{t.forecastLang}</Text> : null}
+                <Text style={st.fcHeadline}>« {forecast.headline} »</Text>
+                {forecast.forecast ? <Text style={st.fcText}>{forecast.forecast}</Text> : null}
+                {forecast.trend ? (
+                  <>
+                    <Text style={st.fcSub}>{t.forecastTrend}</Text>
+                    <Text style={st.fcText}>{forecast.trend}</Text>
+                  </>
+                ) : null}
+                <Text style={st.fcLink} onPress={() => Linking.openURL(forecast.source_url)}>{t.forecastSource} ↗</Text>
+              </View>
+            ) : null}
+            <Text style={st.fcNote}>{t.forecastNote}</Text>
+          </Pressable>
+        ) : null}
+
+        <View style={st.amenBox}>
+          <View style={st.amenHead}>
+            <Text style={st.amenTitle}>{t.amenities}</Text>
+            <Pressable onPress={() => setEditAmen((v) => !v)} hitSlop={8}>
+              <Text style={st.amenEdit}>{editAmen ? t.done : t.amenityEdit}</Text>
+            </Pressable>
+          </View>
+          {editAmen ? <Text style={st.fcNote}>{t.amenityHint}</Text> : null}
+          <View style={st.amenRow}>
+            {AMENITIES.filter(([k]) => {
+              if (editAmen) return true;
+              const a = amen.find((x) => x.amenity === k);
+              return myAmen[k] === true || (myAmen[k] === undefined && a && a.yes > a.no);
+            }).map(([k, icon]) => {
+              const a = amen.find((x) => x.amenity === k);
+              const on = myAmen[k] !== undefined ? myAmen[k] : !!(a && a.yes > a.no);
+              return (
+                <Pressable key={k} disabled={!editAmen} onPress={() => toggleAmen(k)}
+                  style={[st.amenChip, on && st.amenOn, editAmen && !on && st.amenOff]}>
+                  <Text style={[st.amenText, on && { color: C.white }]}>{icon} {t.amenityNames[k]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!editAmen && !AMENITIES.some(([k]) => {
+            const a = amen.find((x) => x.amenity === k);
+            return myAmen[k] === true || (myAmen[k] === undefined && a && a.yes > a.no);
+          }) ? <Text style={st.empty}>{t.amenityNone}</Text> : null}
         </View>
 
         {nearest && (
@@ -209,4 +295,26 @@ const st = StyleSheet.create({
   voteText: { fontSize: 13, color: C.ink },
   voted: { fontSize: 13, color: C.muted },
   disclaimer: { fontSize: 12, color: C.muted, marginTop: 20, textAlign: 'center' },
+  cover: { width: '100%', height: 190, borderRadius: 16, marginBottom: 14 },
+  fc: { backgroundColor: C.white, borderRadius: 14, padding: 14, marginTop: 14, borderWidth: 2, borderStyle: 'dashed' },
+  fcHead: { flexDirection: 'row', alignItems: 'center' },
+  fcDot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderStyle: 'dashed', borderColor: '#33454D', alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  fcTitle: { fontSize: 13, fontWeight: '700', color: C.muted, flex: 1 },
+  fcMore: { fontSize: 12, color: C.muted },
+  fcRisk: { fontSize: 17, fontWeight: '800', marginTop: 6 },
+  fcMeta: { fontSize: 12, color: C.muted, marginTop: 2 },
+  fcNote: { fontSize: 12, color: C.muted, marginTop: 6, fontStyle: 'italic' },
+  fcHeadline: { fontSize: 14, fontWeight: '700', color: C.ink },
+  fcText: { fontSize: 14, color: C.ink, lineHeight: 20 },
+  fcSub: { fontSize: 13, fontWeight: '700', color: C.muted, marginTop: 4 },
+  fcLink: { fontSize: 14, fontWeight: '700', color: C.sea, marginTop: 4 },
+  amenBox: { backgroundColor: C.white, borderRadius: 14, padding: 14, marginTop: 14 },
+  amenHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  amenTitle: { fontSize: 15, fontWeight: '800', color: C.ink },
+  amenEdit: { fontSize: 14, fontWeight: '700', color: C.sea },
+  amenRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  amenChip: { borderWidth: 1, borderColor: C.line, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: C.white },
+  amenOn: { backgroundColor: C.sea, borderColor: C.sea },
+  amenOff: { opacity: 0.55 },
+  amenText: { fontSize: 13, color: C.ink, fontWeight: '600' },
 });

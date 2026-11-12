@@ -6,13 +6,14 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { C, STATUS } from './src/config';
+import { C, STATUS, FORECAST } from './src/config';
 import { STRINGS, LANGS, detectLang, countryName } from './src/i18n';
-import { fetchBeaches, fetchCountries, myFavorites, toggleFavorite } from './src/api';
+import { fetchBeaches, fetchCountries, fetchForecasts, myFavorites, toggleFavorite } from './src/api';
 import { Chip, StatusBadge, FlagDot, minutesAgo } from './src/ui';
 import BeachDetail from './src/BeachDetail';
 import ReportForm from './src/ReportForm';
 import BeachMap from './src/BeachMap';
+import Legend from './src/Legend';
 
 // Vue de départ de la carte pour chaque pays
 const REGIONS = {
@@ -38,6 +39,7 @@ function Main() {
   const t = STRINGS[lang];
   const [countries, setCountries] = useState([]);
   const [beaches, setBeaches] = useState([]);
+  const [forecasts, setForecasts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [country, setCountry] = useState('ALL');
@@ -67,6 +69,9 @@ function Main() {
       setCountries(cs);
       setBeaches(bs);
       myFavorites().then(setFavs).catch(() => {});
+      fetchForecasts()
+        .then((fs) => setForecasts(Object.fromEntries(fs.map((f) => [f.territory, f]))))
+        .catch(() => {});
     } catch {
       setError(true);
     } finally {
@@ -162,12 +167,15 @@ function Main() {
             <Chip label={t.retry} active onPress={() => { setLoading(true); load(); }} />
           </View>
         ) : tab === 'map' ? (
-          <BeachMap
-            ref={mapRef}
-            beaches={visible}
-            region={REGIONS[country] || REGIONS.ALL}
-            onOpen={(id) => setOpenId(id)}
-          />
+          <View style={{ flex: 1 }}>
+            <BeachMap
+              ref={mapRef}
+              beaches={visible}
+              region={REGIONS[country] || REGIONS.ALL}
+              onOpen={(id) => setOpenId(id)}
+            />
+            <Legend t={t} />
+          </View>
         ) : (
           <FlatList
             data={visible}
@@ -177,14 +185,25 @@ function Main() {
             ListEmptyComponent={<Text style={st.muted}>{tab === 'favs' ? t.noFavorites : ''}</Text>}
             renderItem={({ item: b }) => {
               const ago = minutesAgo(b.last_report_at);
+              const fc = b.status === 'unknown' && FORECAST[b.forecast_risk];
               return (
                 <Pressable style={st.row} onPress={() => setOpenId(b.beach_id)}>
-                  <View style={[st.rowBar, { backgroundColor: STATUS[b.status]?.color }]} />
+                  <View style={[st.rowBar, fc
+                    ? { backgroundColor: FORECAST[b.forecast_risk].color, opacity: 0.55 }
+                    : { backgroundColor: STATUS[b.status]?.color }]} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.rowName}>{b.name}</Text>
                     <Text style={st.rowZone}>{b.zone_name}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                      <StatusBadge status={b.status} t={t} />
+                      {fc ? (
+                        <View style={[st.fcBadge, { borderColor: FORECAST[b.forecast_risk].color }]}>
+                          <Text style={[st.fcBadgeText, { color: FORECAST[b.forecast_risk].color }]}>
+                            🛰️ {t.forecastShort[b.forecast_risk]}
+                          </Text>
+                        </View>
+                      ) : (
+                        <StatusBadge status={b.status} t={t} />
+                      )}
                       {b.flag ? <View style={{ marginLeft: 10 }}><FlagDot flag={b.flag} /></View> : null}
                     </View>
                   </View>
@@ -216,6 +235,7 @@ function Main() {
         <BeachDetail
           beach={open}
           beaches={beaches}
+          forecast={open.forecast_territory ? forecasts[open.forecast_territory] : null}
           t={t}
           isFav={favs.includes(open.beach_id)}
           onToggleFav={onToggleFav}
@@ -263,6 +283,8 @@ const st = StyleSheet.create({
   rowName: { fontSize: 17, fontWeight: '800', color: C.ink },
   rowZone: { fontSize: 13, color: C.muted, marginTop: 1 },
   rowAgo: { fontSize: 11, color: C.muted, marginBottom: 2 },
+  fcBadge: { borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
+  fcBadgeText: { fontSize: 12, fontWeight: '700' },
   tabbar: { flexDirection: 'row', backgroundColor: C.white, borderTopWidth: 1, borderColor: C.line },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
   tabIcon: { fontSize: 20, color: C.muted },

@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { STATUS } from './config';
+import { STATUS, FORECAST } from './config';
 
 // Carte OpenStreetMap (fonds OpenFreeMap) affichée avec MapLibre : aucune clé nécessaire.
 const HTML = `<!DOCTYPE html>
@@ -14,6 +14,7 @@ const HTML = `<!DOCTYPE html>
   .pin { width: 30px; height: 30px; border-radius: 15px; border: 3px solid #fff; box-sizing: border-box;
          display: flex; align-items: center; justify-content: center; font-size: 14px;
          box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .pin.fc { border: 2px dashed #33454D; font-size: 12px; box-shadow: none; }
 </style>
 </head><body>
 <div id="map"></div>
@@ -31,7 +32,7 @@ const HTML = `<!DOCTYPE html>
     markers.forEach(function (m) { m.remove(); });
     markers = list.map(function (b) {
       var el = document.createElement('div');
-      el.className = 'pin';
+      el.className = b.fc ? 'pin fc' : 'pin';
       el.style.background = b.color;
       el.textContent = b.emoji;
       el.addEventListener('click', function (e) { e.stopPropagation(); send({ type: 'open', id: b.id }); });
@@ -58,13 +59,18 @@ const BeachMap = forwardRef(function BeachMap({ beaches, region, onOpen }, ref) 
 
   useEffect(() => {
     if (!ready) return;
-    const data = beaches.map((b) => ({
-      id: b.beach_id,
-      lat: b.lat,
-      lng: b.lng,
-      color: (STATUS[b.status] || STATUS.unknown).color,
-      emoji: (STATUS[b.status] || STATUS.unknown).emoji,
-    }));
+    const data = beaches.map((b) => {
+      // pas de signalement récent mais une prévision Météo-France : rond en pointillés
+      const fc = b.status === 'unknown' && FORECAST[b.forecast_risk];
+      return {
+        id: b.beach_id,
+        lat: b.lat,
+        lng: b.lng,
+        fc: !!fc,
+        color: fc ? FORECAST[b.forecast_risk].color + '99' : (STATUS[b.status] || STATUS.unknown).color,
+        emoji: fc ? '🛰️' : (STATUS[b.status] || STATUS.unknown).emoji,
+      };
+    });
     run(`window.setBeaches(${JSON.stringify(data)})`);
   }, [beaches, ready]);
 
