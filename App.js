@@ -24,7 +24,18 @@ const REGIONS = {
   MQ: { latitude: 14.65, longitude: -61.0, latitudeDelta: 0.75, longitudeDelta: 0.75 },
   DO: { latitude: 18.7, longitude: -69.6, latitudeDelta: 2.8, longitudeDelta: 3.6 },
   MX: { latitude: 20.8, longitude: -86.95, latitudeDelta: 1.8, longitudeDelta: 1.6 },
+  PR: { latitude: 18.22, longitude: -66.3, latitudeDelta: 0.9, longitudeDelta: 2.1 },
 };
+
+// Pour un pays ajouté plus tard dans la base : vue calculée à partir de ses plages
+function regionFor(code, beaches) {
+  if (REGIONS[code]) return REGIONS[code];
+  const pts = beaches.filter((b) => b.country_code === code);
+  if (!pts.length) return REGIONS.ALL;
+  const lats = pts.map((b) => b.lat), lngs = pts.map((b) => b.lng);
+  const [a, b2, c, d] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+  return { latitude: (a + b2) / 2, longitude: (c + d) / 2, latitudeDelta: Math.max(0.1, (b2 - a) * 1.3), longitudeDelta: Math.max(0.1, (d - c) * 1.3) };
+}
 
 export default function App() {
   return (
@@ -93,7 +104,7 @@ function Main() {
   const chooseCountry = (c) => {
     setCountry(c);
     AsyncStorage.setItem('country', c).catch(() => {});
-    mapRef.current?.animateToRegion(REGIONS[c] || REGIONS.ALL, 600);
+    mapRef.current?.animateToRegion(regionFor(c, beaches), 600);
   };
 
   // Seuls les pays qui ont déjà des plages apparaissent dans les filtres
@@ -111,6 +122,8 @@ function Main() {
   }, [beaches, country, tab, favs]);
 
   const open = beaches.find((b) => b.beach_id === openId) || null;
+  // vue stable : ne recentre pas la carte à chaque rafraîchissement des données
+  const mapRegion = useMemo(() => regionFor(country, beaches), [country, beaches.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onToggleFav = async () => {
     if (!open) return;
@@ -171,7 +184,7 @@ function Main() {
             <BeachMap
               ref={mapRef}
               beaches={visible}
-              region={REGIONS[country] || REGIONS.ALL}
+              region={mapRegion}
               onOpen={(id) => setOpenId(id)}
             />
             <Legend t={t} />
